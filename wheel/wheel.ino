@@ -32,12 +32,12 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   float speeds[4];
-  setMotorPins(setWheelSpeeds(0, 1, 0, speeds), 2);
+  setMotorPins(setWheelSpeeds(0, 1, 0, speeds), 5);
   delay(200);
-  setMotorPins(setWheelSpeeds(1, 0, 0, speeds), 2);
+  setMotorPins(setWheelSpeeds(1, 0, 0, speeds), 5);
   delay(200);
-  setMotorPins(setWheelSpeeds(0, -1, 0, speeds), 2);
+  setMotorPins(setWheelSpeeds(0, -1, 0, speeds), 5);
   delay(200);
-  setMotorPins(setWheelSpeeds(-1, 0, 0, speeds), 2);
+  setMotorPins(setWheelSpeeds(-1, 0, 0, speeds), 5);
   delay(200);
 }

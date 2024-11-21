@@ -1,105 +1,84 @@
-#include <PS4Controller.h>
-#include "esp_bt_main.h"
-#include "esp_bt_device.h"
-#include "esp_gap_bt_api.h"
-#include "esp_err.h"
+#include <Bluepad32.h>
 
-unsigned long lastTimeStamp = 0;
-#define EVENTS 0
-#define BUTTONS 0
-#define JOYSTICKS 1
-#define SENSORS 0
+ControllerPtr myControllers[BP32_MAX_GAMEPADS];
 
-void setup() {
-  Serial.begin(115200);
-  PS4.attach(notify);
-  PS4.attachOnConnect(onConnect);
-  PS4.attachOnDisconnect(onDisConnect);
-  PS4.begin();
-  removePairedDevices(); // This helps to solve connection issues
-  Serial.print("This device MAC is: ");
-  printDeviceAddress();
-  Serial.println("");
-}
-
-void loop() {
-  delay(100);
-}
-
-void removePairedDevices() {
-  uint8_t pairedDeviceBtAddr[20][6];
-  int count = esp_bt_gap_get_bond_device_num();
-  esp_bt_gap_get_bond_device_list(&count, pairedDeviceBtAddr);
-  for (int i = 0; i < count; i++) {
-    esp_bt_gap_remove_bond_device(pairedDeviceBtAddr[i]);
-  }
-}
-
-void printDeviceAddress() {
-  const uint8_t* point = esp_bt_dev_get_address();
-  for (int i = 0; i < 6; i++) {
-    char str[3];
-    sprintf(str, "%02x", (int)point[i]);
-    Serial.print(str);
-    if (i < 5) {
-      Serial.print(":");
+// This callback gets called any time a new gamepad is connected.
+// Up to 4 gamepads can be connected at the same time.
+void onConnectedController(ControllerPtr ctl) {
+    bool foundEmptySlot = false;
+    for (int i = 0; i < BP32_MAX_GAMEPADS; i++) {
+        if (myControllers[i] == nullptr) {
+            Serial.printf("CALLBACK: Controller is connected, index=%d\n", i);
+            // Additionally, you can get certain gamepad properties like:
+            // Model, VID, PID, BTAddr, flags, etc.
+            ControllerProperties properties = ctl->getProperties();
+            Serial.printf("Controller model: %s, VID=0x%04x, PID=0x%04x\n", ctl->getModelName().c_str(), properties.vendor_id,
+                           properties.product_id);
+            myControllers[i] = ctl;
+            foundEmptySlot = true;
+            break;
+        }
     }
-  }
+    if (!foundEmptySlot) {
+        Serial.println("CALLBACK: Controller connected, but could not found empty slot");
+    }
 }
 
-void onConnect() {
-  Serial.println("Connected!");
+void onDisconnectedController(ControllerPtr ctl) {
+    bool foundController = false;
+
+    for (int i = 0; i < BP32_MAX_GAMEPADS; i++) {
+        if (myControllers[i] == ctl) {
+            Serial.printf("CALLBACK: Controller disconnected from index=%d\n", i);
+            myControllers[i] = nullptr;
+            foundController = true;
+            break;
+        }
+    }
+
+    if (!foundController) {
+        Serial.println("CALLBACK: Controller disconnected, but not found in myControllers");
+    }
 }
 
-void notify() {
-#if EVENTS
-  boolean sqd = PS4.event.button_down.square,
-          squ = PS4.event.button_up.square,
-          trd = PS4.event.button_down.triangle,
-          tru = PS4.event.button_up.triangle;
-  if (sqd)
-    Serial.println("SQUARE down");
-  else if (squ)
-    Serial.println("SQUARE up");
-  else if (trd)
-    Serial.println("TRIANGLE down");
-  else if (tru)
-    Serial.println("TRIANGLE up");
-#endif
+// Arduino setup function. Runs in CPU 1
+void setup() {
+    Serial.begin(115200);
+    Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
+    const uint8_t* addr = BP32.localBdAddress();
+    Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
-#if BUTTONS
-  boolean sq = PS4.Square(),
-          tr = PS4.Triangle();
-  if (sq)
-    Serial.print(" SQUARE pressed");
-  if (tr)
-    Serial.print(" TRIANGLE pressed");
-  if (sq | tr)
-    Serial.println();
-#endif
+    // Setup the Bluepad32 callbacks
+    BP32.setup(&onConnectedController, &onDisconnectedController);
 
-  //Only needed to print the message properly on serial monitor. Else we dont need it.
-  if (millis() - lastTimeStamp > 50) {
-#if JOYSTICKS
-    Serial.printf("lx:%4d,ly:%4d,rx:%4d,ry:%4d\n",
-                  PS4.LStickX(),
-                  PS4.LStickY(),
-                  PS4.RStickX(),
-                  PS4.RStickY());
-#endif
-#if SENSORS
-    Serial.printf("gx:%5d,gy:%5d,gz:%5d,ax:%5d,ay:%5d,az:%5d\n",
-                  PS4.GyrX(),
-                  PS4.GyrY(),
-                  PS4.GyrZ(),
-                  PS4.AccX(),
-                  PS4.AccY(),
-                  PS4.AccZ());
-#endif
-    lastTimeStamp = millis();
-  }
+    // "forgetBluetoothKeys()" should be called when the user performs
+    // a "device factory reset", or similar.
+    // Calling "forgetBluetoothKeys" in setup() just as an example.
+    // Forgetting Bluetooth keys prevents "paired" gamepads to reconnect.
+    // But it might also fix some connection / re-connection issues.
+    BP32.forgetBluetoothKeys();
+
+    // Enables mouse / touchpad support for gamepads that support them.
+    // When enabled, controllers like DualSense and DualShock4 generate two connected devices:
+    // - First one: the gamepad
+    // - Second one, which is a "virtual device", is a mouse.
+    // By default, it is disabled.
+    BP32.enableVirtualDevice(false);
 }
 
-void onDisConnect() {
-  Serial.println("Disconnected!");
+// Arduino loop function. Runs in CPU 1.
+void loop() {
+    // This call fetches all the controllers' data.
+    // Call this function in your main loop.
+    bool dataUpdated = BP32.update();
+    if (dataUpdated) {
+      for (auto controller : myControllers) {
+        if (controller && controller->isConnected() && controller->hasData() && controller->isGamepad()) {
+          Serial.printf("LX: %d, LY: %d; RX: %d, RY: %d\n", controller->axisX(), controller->axisY(), controller->axisRX(), controller->axisRY());
+          break;
+        }
+      }
+    }
+
+  vTaskDelay(1);
 }
