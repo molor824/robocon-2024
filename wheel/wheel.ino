@@ -2,6 +2,7 @@
 const bool FORWARD_STATES[] = { 1, 1, 1, 1 };
 const int DIRECTION_PINS[] = { 22, 24, 26, 28 };
 const int PWM_PINS[] = { 2, 3, 4, 5 };
+float directionX = 0, directionY = 0, rotation = 0;
 
 // y > 0 - forward
 // y < 0 - backward
@@ -21,23 +22,32 @@ void setMotorPins(float speed[4], float maxSpeed = 4) {
   }
 }
 
+struct WheelSerialIn {
+  int16_t directionX;
+  int16_t directionY;
+  int16_t rotation;
+};
+
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(9600);
-  float speeds[4];
-  setWheelSpeeds(0.5, 0.5, 0, speeds);
-  for (int i = 0; i < 4; i++) Serial.println(speeds[i]);
+  Serial.begin(115200);
+  Serial1.begin(115200);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  while (Serial1.available() >= sizeof(WheelSerialIn)) {
+    WheelSerialIn input;
+    Serial1.readBytes((uint8_t*)&input, sizeof(WheelSerialIn));
+    directionX = (float)input.directionX / 512.0f;
+    directionY = (float)input.directionY / 512.0f;
+    rotation = (float)input.rotation / 512.0f;
+    Serial.print(input.directionX);
+    Serial.print(" ");
+    Serial.print(input.directionY);
+    Serial.print(" ");
+    Serial.print(input.rotation);
+    Serial.println();
+  }
   float speeds[4];
-  setMotorPins(setWheelSpeeds(0, 1, 0, speeds), 5);
-  delay(200);
-  setMotorPins(setWheelSpeeds(1, 0, 0, speeds), 5);
-  delay(200);
-  setMotorPins(setWheelSpeeds(0, -1, 0, speeds), 5);
-  delay(200);
-  setMotorPins(setWheelSpeeds(-1, 0, 0, speeds), 5);
-  delay(200);
+  setMotorPins(setWheelSpeeds(directionX, directionY, rotation, speeds));
 }

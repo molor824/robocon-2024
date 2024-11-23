@@ -44,6 +44,7 @@ void onDisconnectedController(ControllerPtr ctl) {
 // Arduino setup function. Runs in CPU 1
 void setup() {
     Serial.begin(115200);
+    Serial1.begin(115200);
     Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
     const uint8_t* addr = BP32.localBdAddress();
     Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
@@ -66,6 +67,15 @@ void setup() {
     BP32.enableVirtualDevice(false);
 }
 
+struct WheelSerialOut {
+  int16_t directionX;
+  int16_t directionY;
+  int16_t rotation;
+};
+
+const int16_t CENTER_X = 4;
+const int16_t CENTER_Y = 4;
+
 // Arduino loop function. Runs in CPU 1.
 void loop() {
     // This call fetches all the controllers' data.
@@ -75,6 +85,11 @@ void loop() {
       for (auto controller : myControllers) {
         if (controller && controller->isConnected() && controller->hasData() && controller->isGamepad()) {
           Serial.printf("LX: %d, LY: %d; RX: %d, RY: %d\n", controller->axisX(), controller->axisY(), controller->axisRX(), controller->axisRY());
+          WheelSerialOut out;
+          out.directionX = controller->axisX() - CENTER_X;
+          out.directionY = controller->axisY() - CENTER_Y;
+          out.rotation = controller->axisRX() - CENTER_X;
+          Serial1.write((uint8_t*)&out, sizeof(WheelSerialOut));
           break;
         }
       }
