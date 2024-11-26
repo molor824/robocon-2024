@@ -44,7 +44,7 @@ void onDisconnectedController(ControllerPtr ctl) {
 // Arduino setup function. Runs in CPU 1
 void setup() {
     Serial.begin(115200);
-    Serial1.begin(115200);
+    Serial2.begin(115200);
     Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
     const uint8_t* addr = BP32.localBdAddress();
     Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
@@ -57,7 +57,7 @@ void setup() {
     // Calling "forgetBluetoothKeys" in setup() just as an example.
     // Forgetting Bluetooth keys prevents "paired" gamepads to reconnect.
     // But it might also fix some connection / re-connection issues.
-    BP32.forgetBluetoothKeys();
+    // BP32.forgetBluetoothKeys();
 
     // Enables mouse / touchpad support for gamepads that support them.
     // When enabled, controllers like DualSense and DualShock4 generate two connected devices:
@@ -67,10 +67,15 @@ void setup() {
     BP32.enableVirtualDevice(false);
 }
 
-struct WheelSerialOut {
+enum CONTROLS : uint16_t {
+  KEY_GRAB = 1,
+  KEY_THROW = 2,
+};
+struct SerialOut {
   int16_t directionX;
   int16_t directionY;
   int16_t rotation;
+  uint16_t controls;
 };
 
 const int16_t CENTER_X = 4;
@@ -84,16 +89,17 @@ void loop() {
     if (dataUpdated) {
       for (auto controller : myControllers) {
         if (controller && controller->isConnected() && controller->hasData() && controller->isGamepad()) {
-          Serial.printf("LX: %d, LY: %d; RX: %d, RY: %d\n", controller->axisX(), controller->axisY(), controller->axisRX(), controller->axisRY());
-          WheelSerialOut out;
+          SerialOut out;
           out.directionX = controller->axisX() - CENTER_X;
           out.directionY = controller->axisY() - CENTER_Y;
           out.rotation = controller->axisRX() - CENTER_X;
-          Serial1.write((uint8_t*)&out, sizeof(WheelSerialOut));
+          out.controls = 0;
+          if (controller->a()) out.controls |= KEY_GRAB;
+          if (controller->b()) out.controls |= KEY_THROW;
+          Serial.println(out.controls);
+          Serial2.write((uint8_t*)&out, sizeof(SerialOut));
           break;
         }
       }
     }
-
-  vTaskDelay(1);
 }
