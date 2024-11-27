@@ -22,9 +22,10 @@ const int THROW_PIN = 51;  // relay
 const int THROW_DIR = 41;
 const int THROW_PWM = 7;
 const int THROW_FORWARD = 0;
-const int THROW_SPEED = 230;
-const float MAX_THROW_TIME = 2.5;
-const float THROW_RELAY_TIME = 2.0;
+const int THROW_SPEED = 200;
+const float MAX_THROW_TIME = 1.5;
+const float THROW_RELAY_TIME = 1.0;
+const float THROW_DEFAULT_SPEED = 80;
 float throwMotorTime = 0;
 
 const int ENCODER_A[] = {21, 20, 19, 18};
@@ -120,6 +121,8 @@ void loop() {
     bool currentKeyLift = (input.inputs & KEY_LIFT) != 0;
     bool currentKeySpeed = (input.inputs & KEY_SPEED_CHANGE) != 0;
 
+    SerialUSB.println(input.inputs);
+
     if (!keyGrab && currentKeyGrab) {
       grab = !grab;
     }
@@ -154,7 +157,7 @@ void loop() {
   
   throwMotorTime += keyThrow ? delta : -delta;
   throwMotorTime = min(max(throwMotorTime, 0), MAX_THROW_TIME);
-  int throwMotorPWM = throwMotorTime > 0 && throwMotorTime < MAX_THROW_TIME && keyThrow ? THROW_SPEED : 0;
+  int throwMotorPWM = throwMotorTime > 0 && throwMotorTime < MAX_THROW_TIME && keyThrow ? THROW_SPEED : THROW_DEFAULT_SPEED;
   bool throwRelay = throwMotorTime >= THROW_RELAY_TIME && keyThrow;
   analogWrite(THROW_PWM, throwMotorPWM);
   digitalWrite(THROW_PIN, throwRelay);
