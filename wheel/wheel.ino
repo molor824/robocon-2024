@@ -1,42 +1,54 @@
 // rightFront, leftFront, leftBack, rightBack
-const bool WHEEL_FORWARD[] = { 0, 1, 0, 0 };
-const int WHEEL_DIRS[] = { 37, 45, 39, 47 };
-const int WHEEL_PWMS[] = { 4, 5, 2, 3 };
-const float CALIB_FACTORS[] = { 1.1, 1.0, 0.9, 1.0 };
-const int GRAB_PINS[] = { 53, 51 }; // relay
-const int GRAB_DIR = 43;
-const int GRAB_PWM = 7;
-const int GRAB_FORWARD = 0;
-const int GRAB_SPEED = 60;
-const int GRAB_DURATION = 1000;
-const int THROW_PINS[] = { 49, 34 };  // relay
-const int THROW_DIR = 41;
-const int THROW_PWM = 6;
-const int THROW_FORWARD = 0;
+const bool WHEEL_FORWARD[] = { 0, 1, 1, 1 };
+const int WHEEL_DIRS[] = { 39, 45, 37, 47 };
+const int WHEEL_PWMS[] = { 2, 5, 4, 3 };
 
+const int GRAB_PIN = 53; // relay
+const int GRAB_DIR = 43;
+const int GRAB_PWM = 6;
+const int GRAB_FORWARD = 0;
+const int GRAB_SPEED = 80;
+const float GRAB_MOTOR_START = 0.2;
+const float MAX_GRAB_TIME = 1.0;
+float grabMotorTime = 0;
+bool grab = false;
+
+const float HALF_LIFT_TIME = 2.5;
+const float LIFT_MOTOR_END = 2.4;
+const float LIFT_MOTOR_START = 0.1;
+float liftMotorTime = HALF_LIFT_TIME * 2;
+
+const int THROW_PIN = 51;  // relay
+const int THROW_DIR = 41;
+const int THROW_PWM = 7;
+const int THROW_FORWARD = 0;
+const int THROW_SPEED = 195;
+const float MAX_THROW_TIME = 3.5;
+const float THROW_RELAY_TIME = 3.0;
+float throwMotorTime = 0;
+
+const int ENCODER_A[] = {21, 20, 19, 18};
+const int ENCODER_B[] = {38, 40, 42, 44};
+const int ENCODER_Z[] = {46, 48, 50, 52};
+
+uint32_t lastElapsed = 0;
 float directionX = 0, directionY = 0, rotation = 0;
-bool keyGrab = false, keyThrow = false;
-// const float GRAB_START_TIME = 0.1;
-// const float GRAB_STOP_TIME = 1.0;
-// const float MAX_GRAB_TIME = 1.2;
-// float grabMotorTime = 0;
-// float throwMotorTime = 0;
-// uint32_t lastElapsed = 0;
+bool keyGrab = false, keyThrow = false, keyLift = false;
 
 // y > 0 - forward
 // y < 0 - backward
 // x > 0 - right
 // x < 0 - left
 float* setWheelSpeeds(float x, float y, float rotation, float speeds[4]) {
-  speeds[0] = y - x - rotation;
-  speeds[1] = y + x + rotation;
-  speeds[2] = y - x + rotation;
-  speeds[3] = y + x - rotation;
-  // float maximum = speeds[0];
-  // for (int i = 1; i < 4; i++)
-  //   if (maximum < speeds[i]) maximum = speeds[i];
-  // for (int i = 0; i < 4; i++)
-  //   speeds[i] /= maximum;
+  speeds[0] = y + x - rotation;
+  speeds[1] = y - x + rotation;
+  speeds[2] = y + x + rotation;
+  speeds[3] = y - x - rotation;
+  float maximum = 1.0;
+  for (int i = 0; i < 4; i++)
+    maximum = max(maximum, speeds[i]);
+  for (int i = 0; i < 4; i++)
+    speeds[i] /= maximum;
   return speeds;
 }
 float absf(float a) {
@@ -53,6 +65,7 @@ void setMotorPins(float speed[4], float maxSpeed = 4) {
 enum CONTROLS : uint16_t {
   KEY_GRAB = 1,
   KEY_THROW = 2,
+  KEY_LIFT = 4,
 };
 struct SerialIn {
   int16_t directionX;
@@ -60,49 +73,36 @@ struct SerialIn {
   int16_t rotation;
   uint16_t controls;
 };
+// #define TEST_MOTOR
+// #define TEST_GRAB
+// #define TEST_THROW
 
 void setup() {
   // put your setup code here, to run once:
   SerialUSB.begin(115200);
   Serial2.begin(115200);
 
-  // lastElapsed = millis();
-}
+  for (int i = 0; i < 4; i++) {
+    pinMode(WHEEL_DIRS[i], OUTPUT);
+    pinMode(WHEEL_PWMS[i], OUTPUT);
+  }
+  pinMode(THROW_PIN, OUTPUT);
+  pinMode(GRAB_PIN, OUTPUT);
+  pinMode(THROW_PWM, OUTPUT);
+  pinMode(THROW_DIR, OUTPUT);
+  pinMode(GRAB_PWM, OUTPUT);
+  pinMode(GRAB_DIR, OUTPUT);
 
-// #define TEST_MOTOR
-
-void throwBall() {
-  digitalWrite(THROW_PWM, HIGH);
   digitalWrite(THROW_DIR, THROW_FORWARD);
-  delay(1000);
-  for (int i = 0; i < 2; i++)
-    digitalWrite(THROW_PINS[i], HIGH);
+
+  lastElapsed = millis();
 }
-void stopThrowBall() {
-  digitalWrite(THROW_PWM, LOW);
-  for (int i = 0; i < 2; i++)
-    digitalWrite(THROW_PINS[i], LOW);
-}
-void grabBall() {
-  for (int i = 0; i < 2; i++)
-    digitalWrite(GRAB_PINS[i], HIGH);
-  delay(100);
-  digitalWrite(GRAB_DIR, GRAB_FORWARD);
-  analogWrite(GRAB_PWM, GRAB_SPEED);
-  delay(GRAB_DURATION);
-  analogWrite(GRAB_PWM, 0);
-  for (int i = 0; i < 2; i++)
-    digitalWrite(GRAB_PINS[i], LOW);
-  delay(100);
-  digitalWrite(GRAB_DIR, !GRAB_FORWARD);
-  analogWrite(GRAB_PWM, GRAB_SPEED);
-  delay(GRAB_DURATION);
-  digitalWrite(GRAB_PWM, 0);
-}
+
+
 void loop() {
-  // uint32_t deltaI = millis() - lastElapsed;
-  // lastElapsed += deltaI;
-  // float delta = (float)deltaI / 1000.0;
+  uint32_t deltaI = millis() - lastElapsed;
+  lastElapsed += deltaI;
+  float delta = (float)deltaI / 1000.0;
 
   while (Serial2.available() >= sizeof(SerialIn)) {
     SerialIn input;
@@ -112,47 +112,46 @@ void loop() {
     rotation = (float)input.rotation / 512.0f;
     bool currentKeyGrab = (input.controls & KEY_GRAB) != 0;
     bool currentKeyThrow = (input.controls & KEY_THROW) != 0;
+    bool currentKeyLift = (input.controls & KEY_LIFT) != 0;
 
-    SerialUSB.println(input.controls);
-
-    if (!keyThrow && currentKeyThrow) {
-      throwBall();
-    } else if (keyThrow && !currentKeyThrow) {
-      stopThrowBall();
-    }
     if (!keyGrab && currentKeyGrab) {
-      grabBall();
+      grab = !grab;
+    }
+    if (!keyLift && currentKeyLift && liftMotorTime == HALF_LIFT_TIME * 2) {
+      liftMotorTime = 0;
     }
 
     keyGrab = currentKeyGrab;
     keyThrow = currentKeyThrow;
+    keyLift = currentKeyLift;
   }
+  SerialUSB.print(keyGrab);
+  SerialUSB.print(" ");
+  SerialUSB.println(keyThrow);
 
-  // grab code (WIP)
-  // if (keyGrab) {
-  //   grabMotorTime += delta;
-  // } else {
-  //   grabMotorTime -= delta;
+  // if (grab) {
+    liftMotorTime += delta;
+    liftMotorTime = min(max(liftMotorTime, 0), HALF_LIFT_TIME * 2);
+    digitalWrite(GRAB_PIN, liftMotorTime < HALF_LIFT_TIME && liftMotorTime > 0 ? HIGH : LOW);
+    digitalWrite(GRAB_DIR, liftMotorTime <= HALF_LIFT_TIME ? GRAB_FORWARD : !GRAB_FORWARD);
+    analogWrite(GRAB_PWM, (liftMotorTime >= LIFT_MOTOR_START && liftMotorTime < LIFT_MOTOR_END)
+      || (liftMotorTime >= HALF_LIFT_TIME && liftMotorTime < (HALF_LIFT_TIME + LIFT_MOTOR_END)) ? GRAB_SPEED : 0);
   // }
-  // grabMotorTime = min(max(grabMotorTime, 0), MAX_GRAB_TIME);
-  // bool inGrabTime = grabMotorTime >= GRAB_START_TIME && grabMotorTime <= GRAB_STOP_TIME;
-  // analogWrite(GRAB_PWM, inGrabTime ? GRAB_SPEED : 0);
-  // digitalWrite(GRAB_DIR, keyGrab ? GRAB_FORWARD : !GRAB_FORWARD);
-  // for (int i = 0; i < 2; i++)
-  //   digitalWrite(GRAB_PINS[i], inGrabTime && !keyGrab);
+  // if (liftMotorTime <= 0) {
+  //   grabMotorTime += grab ? delta : -delta;
+  //   grabMotorTime = min(max(grabMotorTime, 0), MAX_GRAB_TIME);
+  //   digitalWrite(GRAB_PIN, grabMotorTime > 0);
+  //   digitalWrite(GRAB_DIR, grab ? GRAB_FORWARD : !GRAB_FORWARD);
+  //   analogWrite(GRAB_PWM, grabMotorTime >= GRAB_MOTOR_START && grabMotorTime < MAX_GRAB_TIME ? GRAB_SPEED : 0);
+  // }
   
-  #ifndef TEST_MOTOR
+  throwMotorTime += keyThrow ? delta : -delta;
+  throwMotorTime = min(max(throwMotorTime, 0), MAX_THROW_TIME);
+  int throwMotorPWM = throwMotorTime > 0 && throwMotorTime < MAX_THROW_TIME && keyThrow ? THROW_SPEED : 0;
+  bool throwRelay = throwMotorTime >= THROW_RELAY_TIME && keyThrow;
+  analogWrite(THROW_PWM, throwMotorPWM);
+  digitalWrite(THROW_PIN, throwRelay);
+
   float speeds[4];
-  setMotorPins(setWheelSpeeds(directionX, directionY, rotation, speeds), 6);
-  #else
-  for (int i = 0; i < 4; i++) {
-    float speeds[4] = {0, 0, 0, 0};
-    speeds[i] = 1;
-    setMotorPins(speeds, 4);
-    delay(1000);
-    speeds[i] = -1;
-    setMotorPins(speeds, 4);
-    delay(1000);
-  }
-  #endif
+  setMotorPins(setWheelSpeeds(directionX, directionY, rotation, speeds), 1.25);
 }

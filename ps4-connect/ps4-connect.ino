@@ -70,6 +70,7 @@ void setup() {
 enum CONTROLS : uint16_t {
   KEY_GRAB = 1,
   KEY_THROW = 2,
+  KEY_LIFT = 4,
 };
 struct SerialOut {
   int16_t directionX;
@@ -94,8 +95,10 @@ void loop() {
           out.directionY = controller->axisY() - CENTER_Y;
           out.rotation = controller->axisRX() - CENTER_X;
           out.controls = 0;
-          if (controller->a()) out.controls |= KEY_GRAB;
+          Serial.printf("%d %d\n", out.directionX, out.directionY);
           if (controller->b()) out.controls |= KEY_THROW;
+          if (controller->r1()) out.controls |= KEY_GRAB;
+          if (controller->l1()) out.controls |= KEY_LIFT;
           Serial.println(out.controls);
           Serial2.write((uint8_t*)&out, sizeof(SerialOut));
           break;
