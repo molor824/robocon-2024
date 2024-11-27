@@ -71,12 +71,14 @@ enum CONTROLS : uint16_t {
   KEY_GRAB = 1,
   KEY_THROW = 2,
   KEY_LIFT = 4,
+  KEY_SPEED_INC = 8,
+  KEY_SPEED_DEC = 16,
 };
 struct SerialOut {
   int16_t directionX;
   int16_t directionY;
   int16_t rotation;
-  uint16_t controls;
+  uint16_t inputs;
 };
 
 const int16_t CENTER_X = 4;
@@ -94,12 +96,13 @@ void loop() {
           out.directionX = controller->axisX() - CENTER_X;
           out.directionY = controller->axisY() - CENTER_Y;
           out.rotation = controller->axisRX() - CENTER_X;
-          out.controls = 0;
-          Serial.printf("%d %d\n", out.directionX, out.directionY);
-          if (controller->b()) out.controls |= KEY_THROW;
-          if (controller->r1()) out.controls |= KEY_GRAB;
-          if (controller->l1()) out.controls |= KEY_LIFT;
-          Serial.println(out.controls);
+          out.inputs = 0;
+          if (controller->b()) out.inputs |= KEY_THROW;
+          if (controller->r1()) out.inputs |= KEY_GRAB;
+          if (controller->l1()) out.inputs |= KEY_LIFT;
+          if (controller->dpad() & DPAD_UP) out.inputs |= KEY_SPEED_INC;
+          if (controller->dpad() & DPAD_DOWN) out.inputs |= KEY_SPEED_DEC;
+          Serial.println(out.inputs);
           Serial2.write((uint8_t*)&out, sizeof(SerialOut));
           break;
         }

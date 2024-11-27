@@ -22,9 +22,9 @@ const int THROW_PIN = 51;  // relay
 const int THROW_DIR = 41;
 const int THROW_PWM = 7;
 const int THROW_FORWARD = 0;
-const int THROW_SPEED = 195;
-const float MAX_THROW_TIME = 3.5;
-const float THROW_RELAY_TIME = 3.0;
+const int THROW_SPEED = 230;
+const float MAX_THROW_TIME = 2.5;
+const float THROW_RELAY_TIME = 2.0;
 float throwMotorTime = 0;
 
 const int ENCODER_A[] = {21, 20, 19, 18};
@@ -33,7 +33,11 @@ const int ENCODER_Z[] = {46, 48, 50, 52};
 
 uint32_t lastElapsed = 0;
 float directionX = 0, directionY = 0, rotation = 0;
-bool keyGrab = false, keyThrow = false, keyLift = false;
+bool keyGrab = false, keyThrow = false, keyLift = false, keySpeed = false;
+
+const float MAX_SPEED = 1.25;
+const float SLOW_MAX_SPEED = 4;
+bool fastMode = true;
 
 // y > 0 - forward
 // y < 0 - backward
@@ -66,12 +70,13 @@ enum CONTROLS : uint16_t {
   KEY_GRAB = 1,
   KEY_THROW = 2,
   KEY_LIFT = 4,
+  KEY_SPEED_CHANGE = 8,
 };
 struct SerialIn {
   int16_t directionX;
   int16_t directionY;
   int16_t rotation;
-  uint16_t controls;
+  uint16_t inputs;
 };
 // #define TEST_MOTOR
 // #define TEST_GRAB
@@ -110,9 +115,10 @@ void loop() {
     directionX = (float)input.directionX / 512.0f;
     directionY = (float)input.directionY / -512.0f;
     rotation = (float)input.rotation / 512.0f;
-    bool currentKeyGrab = (input.controls & KEY_GRAB) != 0;
-    bool currentKeyThrow = (input.controls & KEY_THROW) != 0;
-    bool currentKeyLift = (input.controls & KEY_LIFT) != 0;
+    bool currentKeyGrab = (input.inputs & KEY_GRAB) != 0;
+    bool currentKeyThrow = (input.inputs & KEY_THROW) != 0;
+    bool currentKeyLift = (input.inputs & KEY_LIFT) != 0;
+    bool currentKeySpeed = (input.inputs & KEY_SPEED_CHANGE) != 0;
 
     if (!keyGrab && currentKeyGrab) {
       grab = !grab;
@@ -120,14 +126,15 @@ void loop() {
     if (!keyLift && currentKeyLift && liftMotorTime == HALF_LIFT_TIME * 2) {
       liftMotorTime = 0;
     }
+    if (!keySpeed && currentKeySpeed) {
+      fastMode = !fastMode;
+    }
 
     keyGrab = currentKeyGrab;
     keyThrow = currentKeyThrow;
     keyLift = currentKeyLift;
+    keySpeed = currentKeySpeed;
   }
-  SerialUSB.print(keyGrab);
-  SerialUSB.print(" ");
-  SerialUSB.println(keyThrow);
 
   // if (grab) {
     liftMotorTime += delta;
@@ -153,5 +160,5 @@ void loop() {
   digitalWrite(THROW_PIN, throwRelay);
 
   float speeds[4];
-  setMotorPins(setWheelSpeeds(directionX, directionY, rotation, speeds), 1.25);
+  setMotorPins(setWheelSpeeds(directionX, directionY, rotation, speeds), fastMode ? MAX_SPEED : SLOW_MAX_SPEED);
 }
