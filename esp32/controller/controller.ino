@@ -68,7 +68,11 @@ void setup() {
 }
 
 enum CONTROLS : uint16_t {
-  KEY_SPEED = 1
+  KEY_SPEED = 1,
+  KEY_GRAB = 1 << 1,
+  KEY_SEND = 1 << 2,
+  KEY_ROTATE_LEFT = 1 << 3,
+  KEY_ROTATE_RIGHT = 1 << 4
 };
 struct SerialOut {
   int16_t directionX;
@@ -88,11 +92,14 @@ void loop() {
     if (dataUpdated) {
       for (auto controller : myControllers) {
         if (controller && controller->isConnected() && controller->hasData() && controller->isGamepad()) {
+          uint8_t dpad = controller->dpad();
           SerialOut out;
           out.directionX = controller->axisX() - CENTER_X;
           out.directionY = controller->axisY() - CENTER_Y;
           out.rotation = controller->axisRX() - CENTER_X;
-          out.inputs = controller->r1() ? KEY_SPEED : 0;
+          out.inputs = (controller->r1() ? KEY_SPEED : 0)
+            | (controller->x() ? KEY_GRAB : 0) | (controller->y() ? KEY_SEND : 0)
+            | (dpad & DPAD_LEFT ? KEY_ROTATE_LEFT : 0) | (dpad & DPAD_RIGHT ? KEY_ROTATE_RIGHT : 0);
           Serial.println(out.inputs);
           Serial2.write((uint8_t*)&out, sizeof(SerialOut));
           break;

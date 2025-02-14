@@ -1,77 +1,84 @@
-const int WHEEL_COUNT = 4;
+#include "omni_wheel.h"
+#include "ball_drop.h"
+#include "stepper.h"
 
-// following math radian rotation
-// FrontRight, FrontLeft, BackLeft, BackRight
-const bool WHEEL_FORWARD[WHEEL_COUNT] = { 0, 1, 1, 1 };
-const int WHEEL_DIRS[WHEEL_COUNT] = { 39, 45, 37, 47 };
-const int WHEEL_PWMS[WHEEL_COUNT] = { 2, 5, 4, 3 };
+const double MAX_SPEED = 1.25;
+const double SLOW_MAX_SPEED = 4;
 
-const float MAX_SPEED = 1.25;
-const float SLOW_MAX_SPEED = 4;
-bool fastMode = true;
-
-const float OMNI_WHEEL_RADIANS[WHEEL_COUNT] = { PI * 0.25, PI * 0.75, PI * 1.25, PI * 1.75 };
-const float OMNI_WHEEL_DIRECTIONS[WHEEL_COUNT][2] = {
-  { -sinf(OMNI_WHEEL_RADIANS[0]), cosf(OMNI_WHEEL_RADIANS[0]) },
-  { -sinf(OMNI_WHEEL_RADIANS[1]), cosf(OMNI_WHEEL_RADIANS[1]) },
-  { -sinf(OMNI_WHEEL_RADIANS[2]), cosf(OMNI_WHEEL_RADIANS[2]) },
-  { -sinf(OMNI_WHEEL_RADIANS[3]), cosf(OMNI_WHEEL_RADIANS[3]) },
-};
-
-// y > 0 - forward
-// y < 0 - backward
-// x > 0 - right
-// x < 0 - left
-float* setWheelSpeeds(float x, float y, float rotation, float speeds[WHEEL_COUNT]) {
-  for (int i = 0; i < WHEEL_COUNT; i++) {
-    const float *OMNI_WHEEL_DIRECTION = OMNI_WHEEL_DIRECTIONS[i];
-    speeds[i] = OMNI_WHEEL_DIRECTION[0] * x + OMNI_WHEEL_DIRECTION[1] * y + rotation;
-  }
-}
-float absf(float a) {
-  if (a < 0.0) return -a;
-  return a;
-}
-void setMotorPins(float speeds[WHEEL_COUNT], float maxSpeed = 4) {
-  for (int i = 0; i < WHEEL_COUNT; i++) {
-    digitalWrite(WHEEL_DIRS[i], speeds[i] > 0.0f ? WHEEL_FORWARD[i] : !WHEEL_FORWARD[i]);
-    analogWrite(WHEEL_PWMS[i], (int)absf(speeds[i] / maxSpeed * 255.0f));
-  }
-}
+const double ROTATE_SPEED = 200.0;
 
 enum CONTROLS : uint16_t {
-  KEY_SPEED_CHANGE = 1,
+  KEY_SPEED_CHANGE = 1 << 0,
+  KEY_GRAB = 1 << 1,
+  KEY_SEND = 1 << 2,
+  KEY_ROTATE_LEFT = 1 << 3,
+  KEY_ROTATE_RIGHT = 1 << 4
 };
+
 struct SerialIn {
   int16_t directionX;
   int16_t directionY;
   int16_t rotation;
   uint16_t inputs;
 };
-// #define TEST_MOTOR
-// #define TEST_GRAB
-// #define TEST_THROW
 
+unsigned long previousElapsed;
 void setup() {
   // put your setup code here, to run once:
   SerialUSB.begin(115200);
   Serial2.begin(115200);
 
-  for (int i = 0; i < WHEEL_COUNT; i++) {
-    pinMode(WHEEL_DIRS[i], OUTPUT);
-    pinMode(WHEEL_PWMS[i], OUTPUT);
-  }
+  omniWheelBegin();
+  ballDropBegin();
+  stepperBegin();
+
+  previousElapsed = micros();
 }
 
+int previousInput = 0;
 
 void loop() {
+  unsigned long elapsed = micros();
+  unsigned long iDelta = elapsed - previousElapsed;
+  if (iDelta < 0) { // compensate for overflows
+    iDelta = (0xFFFFFFFF - previousElapsed) + elapsed + 1;
+  }
+  previousElapsed = elapsed;
+
+  double delta = (double)iDelta / 1000000.0;
+
+  ballDropUpdate(delta);
+  stepperUpdate(delta);
+  wheelUpdate(delta);
+
   while (Serial2.available() >= sizeof(SerialIn)) {
     SerialIn input;
     Serial2.readBytes((uint8_t*)&input, sizeof(SerialIn));
+
+    int inputs = input.inputs;
     
-    bool speedChange = (input.inputs & KEY_SPEED_CHANGE) != 0;
-    float speeds[4];
-    setWheelSpeeds((float)input.directionX / 512.0f, (float)input.directionY / -512.0f, (float)input.rotation / 512.0f, speeds);
-    setMotorPins(speeds, speedChange ? MAX_SPEED : SLOW_MAX_SPEED);
+    bool speedChange = inputs & KEY_SPEED_CHANGE;
+    bool grab = inputs & KEY_GRAB;
+    bool send = inputs & KEY_SEND;
+    bool rotateLeft = inputs & KEY_ROTATE_LEFT;
+    bool rotateRight = inputs & KEY_ROTATE_RIGHT;
+
+    double speedMultiplier = speedChange ? SLOW_MAX_SPEED : MAX_SPEED;
+    double xSpeed = (double)input.directionX / 512.0 * speedMultiplier;
+    double ySpeed = (double)input.directionY / 512.0 * speedMultiplier;
+    double rSpeed = (double)input.rotation / 512.0 * speedMultiplier;
+
+    setSpeeds(xSpeed, ySpeed, rSpeed);
+
+    if (rotateLeft) stepSpeed = ROTATE_SPEED;
+    else if (rotateRight) stepSpeed = -ROTATE_SPEED;
+
+    bool previousGrab = previousInput & KEY_GRAB;
+    bool previousSend = previousInput & KEY_SEND;
+
+    if (grab && !previousGrab) tryGrab();
+    if (send && !previousSend) trySend();
+
+    previousInput = inputs;
   }
 }
