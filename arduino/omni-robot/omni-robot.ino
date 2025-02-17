@@ -1,18 +1,15 @@
+#include <LibPrintf.h>
 #include "omni_wheel.h"
-#include "ball_drop.h"
-#include "stepper.h"
+#include "cylinders.h"
 
-const double MAX_SPEED = 1.25;
-const double SLOW_MAX_SPEED = 4;
-
-const double ROTATE_SPEED = 200.0;
+const double MAX_SPEED = 400.0;
+const double SLOW_MAX_SPEED = 300.0;
 
 enum CONTROLS : uint16_t {
   KEY_SPEED_CHANGE = 1 << 0,
-  KEY_GRAB = 1 << 1,
-  KEY_SEND = 1 << 2,
-  KEY_ROTATE_LEFT = 1 << 3,
-  KEY_ROTATE_RIGHT = 1 << 4
+  KEY_EXTEND = 1 << 1,
+  KEY_THROW = 1 << 2,
+  KEY_CATCH = 1 << 3,
 };
 
 struct SerialIn {
@@ -27,15 +24,15 @@ void setup() {
   // put your setup code here, to run once:
   SerialUSB.begin(115200);
   Serial2.begin(115200);
+  printf_init(SerialUSB);
 
   omniWheelBegin();
-  ballDropBegin();
-  stepperBegin();
+  cylinderBegin();
 
   previousElapsed = micros();
 }
 
-int previousInput = 0;
+int prevInputs = 0;
 
 void loop() {
   unsigned long elapsed = micros();
@@ -47,9 +44,8 @@ void loop() {
 
   double delta = (double)iDelta / 1000000.0;
 
-  ballDropUpdate(delta);
-  stepperUpdate(delta);
   wheelUpdate(delta);
+  cylinderUpdate(delta);
 
   while (Serial2.available() >= sizeof(SerialIn)) {
     SerialIn input;
@@ -58,27 +54,28 @@ void loop() {
     int inputs = input.inputs;
     
     bool speedChange = inputs & KEY_SPEED_CHANGE;
-    bool grab = inputs & KEY_GRAB;
-    bool send = inputs & KEY_SEND;
-    bool rotateLeft = inputs & KEY_ROTATE_LEFT;
-    bool rotateRight = inputs & KEY_ROTATE_RIGHT;
 
     double speedMultiplier = speedChange ? SLOW_MAX_SPEED : MAX_SPEED;
     double xSpeed = (double)input.directionX / 512.0 * speedMultiplier;
-    double ySpeed = (double)input.directionY / 512.0 * speedMultiplier;
+    double ySpeed = (double)input.directionY / -512.0 * speedMultiplier;
     double rSpeed = (double)input.rotation / 512.0 * speedMultiplier;
 
     setSpeeds(xSpeed, ySpeed, rSpeed);
+    printf("x: %f, y: %f, r: %f, mul: %f\n", xSpeed, ySpeed, rSpeed, speedMultiplier);
 
-    if (rotateLeft) stepSpeed = ROTATE_SPEED;
-    else if (rotateRight) stepSpeed = -ROTATE_SPEED;
+    bool extend = inputs & KEY_EXTEND;
+    bool prevExtend = prevInputs & KEY_EXTEND;
 
-    bool previousGrab = previousInput & KEY_GRAB;
-    bool previousSend = previousInput & KEY_SEND;
+    bool keyThrow = inputs & KEY_THROW;
+    bool prevThrow = prevInputs & KEY_THROW;
 
-    if (grab && !previousGrab) tryGrab();
-    if (send && !previousSend) trySend();
+    bool keyCatch = inputs & KEY_CATCH;
+    bool prevCatch = prevInputs & KEY_CATCH;
 
-    previousInput = inputs;
+    if (extend && !prevExtend) cylinderExtend();
+    if (keyThrow && !prevThrow) cylinderThrow();
+    if (keyCatch && !prevCatch) cylinderCatch();
+
+    prevInputs = inputs;
   }
 }
