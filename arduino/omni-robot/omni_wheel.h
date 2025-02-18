@@ -8,7 +8,7 @@
 const int WHEEL_COUNT = 4;
 
 // #define TEST
-#define NOENCODER
+// #define NOENCODER
 
 // following math radian rotation
 // FrontRight, FrontLeft, BackLeft, BackRight
@@ -30,9 +30,9 @@ const int ENCODER_F_CLK = 21;
 const int ENCODER_L_DT = 44;
 const int ENCODER_R_DT = 42;
 const int ENCODER_F_DT = 40;
-const int ENCODER_L_TURN = 1;
-const int ENCODER_R_TURN = 1;
-const int ENCODER_F_TURN = 1;
+const int ENCODER_L_TURN = -1;
+const int ENCODER_R_TURN = -1;
+const int ENCODER_F_TURN = -1;
 
 const double OMNI_WHEEL_RADIANS[WHEEL_COUNT] = { PI * 0.25, PI * 0.75, PI * 1.25, PI * 1.75 };
 const double OMNI_WHEEL_DIRECTIONS[WHEEL_COUNT][2] = {
@@ -135,11 +135,12 @@ void wheelUpdate(double delta) {
   motorXspeed = setXspeed;
   motorYspeed = setYspeed;
   motorRspeed = setRspeed;
-
   #endif
+
   #ifndef TEST
   setMotorSpeeds(motorXspeed, motorYspeed, motorRspeed);
   #else
+  #ifdef MOTOR_TEST
   static int wheelToRotate = 0;
   static double duration = 0.0;
   const double DURATION = 1.0;
@@ -153,6 +154,7 @@ void wheelUpdate(double delta) {
     digitalWrite(WHEEL_PIN_DIRS[i], WHEEL_PINSTATE_FORWARDS[i]);
     analogWrite(WHEEL_PIN_PWMS[i], wheelToRotate == i ? 100 : 0);
   }
+  #endif
   printf(
     "delta %f encoder r %lld l %lld f %lld, speed dx %f dy %f drot %f, mspeed dx %f dy %f drot %f\n",
     delta,
