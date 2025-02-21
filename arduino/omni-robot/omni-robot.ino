@@ -2,14 +2,18 @@
 #include "omni_wheel.h"
 #include "cylinders.h"
 
-const double MAX_SPEED = 400.0;
-const double SLOW_MAX_SPEED = 300.0;
+const double MAX_SPEED = 2500.0;
+const double SLOW_MAX_SPEED = 2000.0;
+const double ROTATION_MULTIPLIER = 0.7;
+
+bool slowMode = true;
 
 enum CONTROLS : uint16_t {
   KEY_SPEED_CHANGE = 1 << 0,
   KEY_EXTEND = 1 << 1,
   KEY_THROW = 1 << 2,
   KEY_CATCH = 1 << 3,
+  KEY_RESET = 1 << 4,
 };
 
 struct SerialIn {
@@ -52,16 +56,6 @@ void loop() {
     Serial2.readBytes((uint8_t*)&input, sizeof(SerialIn));
 
     int inputs = input.inputs;
-    
-    bool speedChange = inputs & KEY_SPEED_CHANGE;
-
-    double speedMultiplier = speedChange ? SLOW_MAX_SPEED : MAX_SPEED;
-    double xSpeed = (double)input.directionX / 512.0 * speedMultiplier;
-    double ySpeed = (double)input.directionY / -512.0 * speedMultiplier;
-    double rSpeed = (double)input.rotation / 512.0 * speedMultiplier;
-
-    setSpeeds(xSpeed, ySpeed, rSpeed);
-    printf("x: %f, y: %f, r: %f, mul: %f\n", xSpeed, ySpeed, rSpeed, speedMultiplier);
 
     bool extend = inputs & KEY_EXTEND;
     bool prevExtend = prevInputs & KEY_EXTEND;
@@ -72,10 +66,24 @@ void loop() {
     bool keyCatch = inputs & KEY_CATCH;
     bool prevCatch = prevInputs & KEY_CATCH;
 
+    bool speedChange = inputs & KEY_SPEED_CHANGE;
+    bool prevSpeedChange = prevInputs & KEY_SPEED_CHANGE;
+
+    bool reset = inputs & KEY_RESET;
+    bool prevReset = prevInputs & KEY_RESET;
+
     if (extend && !prevExtend) cylinderExtend();
     if (keyThrow && !prevThrow) cylinderThrow();
     if (keyCatch && !prevCatch) cylinderCatch();
-
+    if (speedChange && !prevSpeedChange) slowMode = !slowMode;
+    if (reset && !prevReset) wheelReset();
     prevInputs = inputs;
+
+    double speedMultiplier = slowMode ? SLOW_MAX_SPEED : MAX_SPEED;
+    double xSpeed = (double)input.directionX / 512.0 * speedMultiplier;
+    double ySpeed = (double)input.directionY / -512.0 * speedMultiplier;
+    double rSpeed = (double)input.rotation / -512.0 * speedMultiplier * ROTATION_MULTIPLIER;
+
+    setSpeeds(xSpeed, ySpeed, rSpeed);
   }
 }
