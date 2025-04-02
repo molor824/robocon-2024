@@ -43,8 +43,8 @@ void onDisconnectedController(ControllerPtr ctl) {
 
 // Arduino setup function. Runs in CPU 1
 void setup() {
-    Serial.begin(115200);
-    Serial2.begin(115200);
+    Serial.begin(500000);
+    Serial2.begin(500000);
     Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
     const uint8_t* addr = BP32.localBdAddress();
     Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
@@ -86,10 +86,11 @@ const int16_t CENTER_Y = 4;
 
 // Arduino loop function. Runs in CPU 1.
 void loop() {
+
     // This call fetches all the controllers' data.
     // Call this function in your main loop.
-    bool dataUpdated = BP32.update();
-    if (dataUpdated) {
+    bool updated = BP32.update();
+    if (updated) {
       for (auto controller : myControllers) {
         if (controller && controller->isConnected() && controller->hasData() && controller->isGamepad()) {
           uint8_t dpad = controller->dpad();

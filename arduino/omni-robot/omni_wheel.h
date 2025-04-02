@@ -5,17 +5,17 @@
 
 #include <Arduino.h>
 
-const int WHEEL_COUNT = 4;
+const int WHEEL_COUNT = 3;
 
 // #define TEST
 // #define MOTOR_TEST
-// #define NOENCODER
+#define NOENCODER
 
 // following math radian rotation
 // FrontRight, FrontLeft, BackLeft, BackRight
-const bool WHEEL_PINSTATE_FORWARDS[WHEEL_COUNT] = { 1, 0, 0, 0 };
-const int WHEEL_PIN_DIRS[WHEEL_COUNT] = { 39, 45, 37, 47 };
-const int WHEEL_PIN_PWMS[WHEEL_COUNT] = { 2, 5, 4, 3 };
+const bool WHEEL_PINSTATE_FORWARDS[WHEEL_COUNT] = { 1, 0, 0 };
+const int WHEEL_PIN_DIRS[WHEEL_COUNT] = { 39, 37, 47 };
+const int WHEEL_PIN_PWMS[WHEEL_COUNT] = { 2, 4, 3 };
 
 // Left Right Front encoders
 // L direction 0, -1
@@ -35,12 +35,11 @@ const int ENCODER_L_TURN = -1;
 const int ENCODER_R_TURN = -1;
 const int ENCODER_F_TURN = -1;
 
-const double OMNI_WHEEL_RADIANS[WHEEL_COUNT] = { PI * 0.25, PI * 0.75, PI * 1.25, PI * 1.75 };
+const double OMNI_WHEEL_RADIANS[WHEEL_COUNT] = { PI, PI + PI * 2.0 / 3.0, PI * 1.0 / 3.0 };
 const double OMNI_WHEEL_DIRECTIONS[WHEEL_COUNT][2] = {
   { cos(OMNI_WHEEL_RADIANS[0]), sin(OMNI_WHEEL_RADIANS[0]) },
   { cos(OMNI_WHEEL_RADIANS[1]), sin(OMNI_WHEEL_RADIANS[1]) },
-  { cos(OMNI_WHEEL_RADIANS[2]), sin(OMNI_WHEEL_RADIANS[2]) },
-  { cos(OMNI_WHEEL_RADIANS[3]), sin(OMNI_WHEEL_RADIANS[3]) },
+  { cos(OMNI_WHEEL_RADIANS[2]), sin(OMNI_WHEEL_RADIANS[2]) }
 };
 
 const double PAUSE_DURATION = 0.2;
@@ -71,7 +70,7 @@ PID pidR = pidX;
 // x > 0 - right
 // x < 0 - left
 void setMotorSpeeds(double x, double y, double rotation) {
-  const int MINIMUM_REQUIRED_PWM = 32;
+  const int MINIMUM_REQUIRED_PWM = 0;
   for (int i = 0; i < WHEEL_COUNT; i++) {
     const double *OMNI_WHEEL_DIRECTION = OMNI_WHEEL_DIRECTIONS[i];
     double speed = OMNI_WHEEL_DIRECTION[0] * x + OMNI_WHEEL_DIRECTION[1] * y + rotation;
@@ -175,19 +174,21 @@ void wheelUpdate(double delta) {
   if (duration >= DURATION) {
     duration = 0.0;
     wheelToRotate += 1;
-    if (wheelToRotate > 4) wheelToRotate = 0;
+    if (wheelToRotate > 3) wheelToRotate = 0;
   }
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 3; i++) {
     digitalWrite(WHEEL_PIN_DIRS[i], WHEEL_PINSTATE_FORWARDS[i]);
     analogWrite(WHEEL_PIN_PWMS[i], wheelToRotate == i ? 100 : 0);
   }
   #endif
+  #ifndef NOENCODER
   printf(
     "delta %f encoder r %lld l %lld f %lld, speed dx %f dy %f drot %f, mspeed dx %f dy %f drot %f\n",
     delta,
     encoderRturns, encoderLturns, encoderFturns,
     dx, dy, drot, motorXspeed, motorYspeed, motorRspeed
   );
+  #endif
   #endif
 }
 

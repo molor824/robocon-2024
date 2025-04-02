@@ -16,6 +16,9 @@ void cylinderBegin() {
   pinMode(THROW_PIN, OUTPUT);
   pinMode(EXTEND_PIN, OUTPUT);
   pinMode(CATCH_PIN, OUTPUT);
+  digitalWrite(THROW_PIN, LOW);
+  digitalWrite(EXTEND_PIN, LOW);
+  digitalWrite(CATCH_PIN, LOW);
 }
 void cylinderExtend() {
   if (cylinderExtended) {
