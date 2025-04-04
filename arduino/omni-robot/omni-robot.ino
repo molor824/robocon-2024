@@ -2,8 +2,8 @@
 #include "omni_wheel.h"
 #include "cylinders.h"
 
-const double MAX_SPEED = 300.0;
-const double SLOW_MAX_SPEED = 100.0;
+const double MAX_SPEED = 2000.0;
+const double SLOW_MAX_SPEED = 1000.0;
 const double ROTATION_MULTIPLIER = 0.7;
 
 bool slowMode = true;
@@ -26,9 +26,9 @@ struct SerialIn {
 unsigned long previousElapsed;
 void setup() {
   // put your setup code here, to run once:
-  SerialUSB.begin(500000);
+  Serial.begin(115200);
   Serial2.begin(500000);
-  printf_init(SerialUSB);
+  printf_init(Serial);
 
   omniWheelBegin();
   cylinderBegin();
@@ -70,13 +70,12 @@ void loop() {
     bool prevSpeedChange = prevInputs & KEY_SPEED_CHANGE;
 
     bool reset = inputs & KEY_RESET;
-    bool prevReset = prevInputs & KEY_RESET;
 
     if (extend && !prevExtend) cylinderExtend();
     if (keyThrow && !prevThrow) cylinderThrow();
     if (keyCatch && !prevCatch) cylinderCatch();
     if (speedChange && !prevSpeedChange) slowMode = !slowMode;
-    if (reset && !prevReset) wheelReset();
+    if (reset) wheelReset();
     prevInputs = inputs;
 
     double speedMultiplier = slowMode ? SLOW_MAX_SPEED : MAX_SPEED;

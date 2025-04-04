@@ -6,15 +6,13 @@ def track(model: YOLO, img: cv.Mat):
     return list(model.track(img, stream=True))
 
 def main():
-    model = YOLO("best.onnx", 'detect')
+    model = YOLO("basketball-nano.pt", task="detect")
     pool = Pool(processes=1)
     results = None
     track_future = None
     duration = None
 
     cap = cv.VideoCapture('tcp://192.168.8.12:10001')
-    cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
 
     while True:
         success, img = cap.read()
@@ -26,7 +24,7 @@ def main():
         
         if track_future.ready():
             results = track_future.get()
-            track_future = None
+            track_future = pool.apply_async(track, (model, img))
         
         if results:
             for result in results:
