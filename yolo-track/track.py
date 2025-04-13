@@ -12,7 +12,7 @@ def main():
     track_future = None
     duration = None
 
-    cap = cv.VideoCapture('tcp://192.168.8.12:10001')
+    cap = cv.VideoCapture('tcp://192.168.1.115:10001')
 
     while True:
         success, img = cap.read()

@@ -1,5 +1,6 @@
 #include <Bluepad32.h>
 #include "movement.h"
+#include "cylinders.h"
 
 ControllerPtr myControllers[BP32_MAX_GAMEPADS];
 
@@ -46,25 +47,14 @@ double inactiveDuration = 0.0;
 
 unsigned long lastElapsed;
 
-enum CONTROLS : uint16_t {
-  KEY_SPEED_CHANGE = 1 << 0,
-  KEY_EXTEND = 1 << 1,
-  KEY_THROW = 1 << 2,
-  KEY_CATCH = 1 << 3,
-  KEY_RESET = 1 << 4,
-};
-struct SerialOut {
-  int16_t directionX;
-  int16_t directionY;
-  int16_t rotation;
-  uint16_t inputs;
-};
-
 const int16_t CENTER_X = 4;
 const int16_t CENTER_Y = 4;
 
 bool keySpeedChange = false, keyBrake = false;
 bool prevSpeedChange = false;
+bool keyExtend = false, prevExtend = false;
+bool keyCatch = false, prevCatch = true;
+bool keyThrow = false, prevThrow = false;
 bool fastMode = false;
 
 double directionX = 0.0, directionY = 0.0, rotation = 0.0;
@@ -73,7 +63,7 @@ double directionX = 0.0, directionY = 0.0, rotation = 0.0;
 void setup() {
   lastElapsed = micros();
 
-  Serial.begin(500000);
+  Serial.begin(115200);
   Serial2.begin(500000);
   Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
   const uint8_t* addr = BP32.localBdAddress();
@@ -82,29 +72,25 @@ void setup() {
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedController, &onDisconnectedController);
 
-  // "forgetBluetoothKeys()" should be called when the user performs
-  // a "device factory reset", or similar.
-  // Calling "forgetBluetoothKeys" in setup() just as an example.
-  // Forgetting Bluetooth keys prevents "paired" gamepads to reconnect.
-  // But it might also fix some connection / re-connection issues.
-  // BP32.forgetBluetoothKeys();
-
-  // Enables mouse / touchpad support for gamepads that support them.
-  // When enabled, controllers like DualSense and DualShock4 generate two connected devices:
-  // - First one: the gamepad
-  // - Second one, which is a "virtual device", is a mouse.
-  // By default, it is disabled.
   BP32.enableVirtualDevice(false);
+  delay(1);
 }
 void onInputUpdate() {
-  if (keySpeedChange && !prevSpeedChange) {
-    fastMode = !fastMode;
-  }
-  prevSpeedChange = keySpeedChange;
-  if (keyBrake) Movement::brake();
-  else Movement::setVelocities(directionX, directionY, rotation, fastMode);
-}
+  if (keySpeedChange && !prevSpeedChange) Movement::toggleFastMode();
+  Movement::setDirections(directionX, directionY, rotation);
+  Movement::setBrake(keyBrake);
 
+  if (keyExtend && !prevExtend) Cylinders::toggleExtend();
+  if (keyThrow && !prevThrow) Cylinders::startThrow();
+
+  prevSpeedChange = keySpeedChange;
+  prevExtend = keyExtend;
+  prevThrow = keyThrow;
+}
+struct SerialOutput {
+  int16_t omni[3];
+  uint8_t cylinder;
+};
 // Arduino loop function. Runs in CPU 1.
 void loop() {
   unsigned long elapsed = micros();
@@ -133,10 +119,12 @@ void loop() {
         // Serial2.write((uint8_t*)&out, sizeof(SerialOut));
 
         directionX = (double)(controller->axisX() - CENTER_X) / 512.0;
-        directionY = (double)(controller->axisY() - CENTER_Y) / 512.0;
-        rotation = (double)(controller->axisRX() - CENTER_X) / 512.0;
+        directionY = (double)(controller->axisY() - CENTER_Y) / -512.0;
+        rotation = (double)(controller->axisRX() - CENTER_X) / -512.0;
         keySpeedChange = controller->r1();
-        keyBrake = controller->r2();
+        keyBrake = controller->l1();
+        keyThrow = controller->a();
+        keyExtend = controller->b();
         inactiveDuration = 0.0;
         onInputUpdate();
         break;
@@ -150,5 +138,15 @@ void loop() {
   }
 
   Movement::loop(delta);
-  Movement::sendSerial();
+  Cylinders::loop(delta);
+
+  if (Serial2.available() > 0) {
+    Serial2.read();
+
+    SerialOutput out;
+    Movement::serial(out.omni);
+    out.cylinder = Cylinders::serial();
+
+    Serial2.write((uint8_t*)&out, sizeof(SerialOutput));
+  }
 }

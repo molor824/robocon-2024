@@ -1,6 +1,7 @@
+#include "HardwareSerial.h"
 #pragma once
 
-#include "vector3.h"
+#include "vector2.h"
 
 namespace Movement {
   const double MAX_ACCEL = 400.0;
@@ -8,47 +9,64 @@ namespace Movement {
   const double SLOW_SPEED = 100.0;
   const double ROTATION_MULTIPLIER = 0.6;
 
-  Vector3 currentVelocity = {};
-  Vector3 velocity = {};
+  Vector2 currentVelocity = {};
+  double currentRotation = 0.0;
+  Vector2 direction = {};
+  double rotation = 0.0;
 
   double omni0 = 0.0, omni1 = 0.0, omni2 = 0.0;
+  bool fastMode = false;
+  bool brake = false;
 
-  void setOmniSpeed(Vector3 velocity) {
+  void setOmniSpeed(Vector2 velocity, double rotation) {
     const double SQRT_3_HALF = sqrt(3.0) * 0.5;
 
     double vx = velocity.x;
     double vy = velocity.y;
-    double vr = velocity.z;
+    double vr = rotation;
 
     omni0 = -vx + vr;
     omni1 = vx * 0.5 - vy * SQRT_3_HALF + vr;
     omni2 = vx * 0.5 + vy * SQRT_3_HALF + vr;
   }
-  void brake() {
-    currentVelocity = {};
-    omni0 = omni1 = omni2 = 0.0;
+  void setBrake(bool _brake) {
+    brake = _brake;
   }
-  void setVelocities(double directionX, double directionY, double rotation, bool fastMode) {
-    double speed = fastMode ? FAST_SPEED : SLOW_SPEED;
-    velocity = Vector3(
-      directionX * speed,
-      directionY * speed,
-      rotation * speed * ROTATION_MULTIPLIER
+  void toggleFastMode() {
+    fastMode = !fastMode;
+  }
+  void setDirections(double directionX, double directionY, double _rotation) {
+    direction = Vector2(
+      directionX,
+      directionY
     );
+    rotation = _rotation;
+  }
+  double moveToward(double current, double target, double max) {
+    double diff = target - current;
+    if (abs(diff) <= max) return target;
+    return current + (diff < 0.0 ? -max : max);
   }
   void loop(double delta) {
+    if (brake) {
+      omni0 = omni1 = omni2 = 0.0;
+      currentVelocity = {};
+      currentRotation = 0.0;
+      return;
+    }
+    double speed = fastMode ? FAST_SPEED : SLOW_SPEED;
+    Vector2 targetVelocity = direction.mul(speed);
+    double targetRotation = rotation * ROTATION_MULTIPLIER * speed;
+
     double acceleration = MAX_ACCEL * delta;
-    currentVelocity = currentVelocity.moveToward(velocity, acceleration);
+    currentVelocity = currentVelocity.moveToward(targetVelocity, acceleration);
+    currentRotation = moveToward(currentRotation, targetRotation, acceleration);
 
-    setOmniSpeed(currentVelocity);
+    setOmniSpeed(currentVelocity, currentRotation);
   }
-  void sendSerial() {
-    int16_t omniSpeeds[3] = {
-      constrain(round(omni0), -255, 255),
-      constrain(round(omni1), -255, 255),
-      constrain(round(omni2), -255, 255),
-    };
-
-    Serial2.write((uint8_t*)omniSpeeds, sizeof(omniSpeeds));
+  void serial(int16_t speeds[3]) {
+    speeds[0] = constrain(round(omni0), -255, 255);
+    speeds[1] = constrain(round(omni1), -255, 255);
+    speeds[2] = constrain(round(omni2), -255, 255);
   }
 };

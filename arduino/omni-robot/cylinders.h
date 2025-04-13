@@ -5,7 +5,6 @@
 
 const int EXTEND_PIN = 51;
 const int THROW_PIN = 53;
-const int CATCH_PIN = 49;
 const double MAX_THROW = 0.5;
 
 double throwDuration = 0.0;
