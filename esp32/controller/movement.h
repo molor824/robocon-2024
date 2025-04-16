@@ -5,9 +5,12 @@
 
 namespace Movement {
   const double MAX_ACCEL = 400.0;
+  // sideway motion had this issue where there was unnecessary rotaion
+  const double COUNTER_ROTATION_MULTIPLIER = 0.3;
+
   const double FAST_SPEED = 200.0;
   const double SLOW_SPEED = 100.0;
-  const double ROTATION_MULTIPLIER = 0.6;
+  const double ROTATION_SPEED = 60.0;
 
   Vector2 currentVelocity = {};
   double currentRotation = 0.0;
@@ -56,11 +59,21 @@ namespace Movement {
     }
     double speed = fastMode ? FAST_SPEED : SLOW_SPEED;
     Vector2 targetVelocity = direction.mul(speed);
-    double targetRotation = rotation * ROTATION_MULTIPLIER * speed;
+    double targetRotation = rotation * ROTATION_SPEED;
 
+    Vector2 prevVelocity = currentVelocity;
     double acceleration = MAX_ACCEL * delta;
-    currentVelocity = currentVelocity.moveToward(targetVelocity, acceleration);
-    currentRotation = moveToward(currentRotation, targetRotation, acceleration);
+    if (abs(targetRotation) <= 0.000001) {
+      currentRotation = targetRotation;
+    } else {
+      currentRotation = moveToward(currentRotation, targetRotation, acceleration);
+    }
+    if (targetVelocity.almostZero()) {
+      currentVelocity = {};
+    } else {
+      currentVelocity = currentVelocity.moveToward(targetVelocity, acceleration);
+      currentRotation -= (currentVelocity.x - prevVelocity.x) * COUNTER_ROTATION_MULTIPLIER;
+    }
 
     setOmniSpeed(currentVelocity, currentRotation);
   }

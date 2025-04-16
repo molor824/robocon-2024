@@ -25,4 +25,7 @@ struct Vector2 {
     if (length <= max) return target;
     return add(diff.mul(max / length));
   }
+  bool almostZero(double difference = 0.000001) const {
+    return abs(x) <= difference && abs(y) <= difference;
+  }
 };
