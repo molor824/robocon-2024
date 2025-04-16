@@ -81,11 +81,13 @@ void onInputUpdate() {
   Movement::setBrake(keyBrake);
 
   if (keyExtend && !prevExtend) Cylinders::toggleExtend();
+  if (keyCatch && !prevCatch) Cylinders::toggleCatch();
   if (keyThrow && !prevThrow) Cylinders::startThrow();
 
   prevSpeedChange = keySpeedChange;
   prevExtend = keyExtend;
   prevThrow = keyThrow;
+  prevCatch = keyCatch;
 }
 struct SerialOutput {
   int16_t omni[3];
@@ -125,6 +127,7 @@ void loop() {
         keyBrake = controller->l1();
         keyThrow = controller->a();
         keyExtend = controller->b();
+        keyCatch = controller->x();
         inactiveDuration = 0.0;
         onInputUpdate();
         break;

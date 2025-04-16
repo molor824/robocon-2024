@@ -19,7 +19,7 @@ namespace Cylinders {
     throwDuration = MAX_THROW_DURATION;
   }
   void loop(double delta) {
-    throwPin = throwDuration <= 0.0;
+    throwPin = throwDuration > 0.0;
     if (throwDuration > 0) throwDuration -= delta;
   }
   uint8_t serial() {
