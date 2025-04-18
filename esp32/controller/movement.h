@@ -4,9 +4,9 @@
 #include "vector2.h"
 
 namespace Movement {
-  const double MAX_ACCEL = 400.0;
-  // sideway motion had this issue where there was unnecessary rotaion
-  const double COUNTER_ROTATION_MULTIPLIER = 0.3;
+  const double MAX_VERTICAL_ACCEL = 400.0;
+  const double MAX_HORIZONTAL_ACCEL = 200.0;
+  const double MAX_ROTATION_ACCEL = 800.0;
 
   const double FAST_SPEED = 200.0;
   const double SLOW_SPEED = 100.0;
@@ -61,19 +61,10 @@ namespace Movement {
     Vector2 targetVelocity = direction.mul(speed);
     double targetRotation = rotation * ROTATION_SPEED;
 
-    Vector2 prevVelocity = currentVelocity;
-    double acceleration = MAX_ACCEL * delta;
-    if (abs(targetRotation) <= 0.000001) {
-      currentRotation = targetRotation;
-    } else {
-      currentRotation = moveToward(currentRotation, targetRotation, acceleration);
-    }
-    if (targetVelocity.almostZero()) {
-      currentVelocity = {};
-    } else {
-      currentVelocity = currentVelocity.moveToward(targetVelocity, acceleration);
-      currentRotation -= (currentVelocity.x - prevVelocity.x) * COUNTER_ROTATION_MULTIPLIER;
-    }
+    currentRotation = moveToward(currentRotation, targetRotation, MAX_ROTATION_ACCEL * delta);
+    currentVelocity.x = moveToward(currentVelocity.x, targetVelocity.x, MAX_HORIZONTAL_ACCEL * delta);
+    currentVelocity.y = moveToward(currentVelocity.y, targetVelocity.y, MAX_VERTICAL_ACCEL * delta);
+    // currentRotation -= (currentVelocity.x - prevVelocity.x) * COUNTER_ROTATION_MULTIPLIER;
 
     setOmniSpeed(currentVelocity, currentRotation);
   }

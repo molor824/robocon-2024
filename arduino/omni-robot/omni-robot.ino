@@ -40,10 +40,7 @@ void loop() {
   Serial2.readBytes((uint8_t*)&input, sizeof(SerialInput));
   for (int i = 0; i < 3; i++) {
     setMotorSpeed(input.omni[i], i);
-    SerialUSB.print(input.omni[i]);
-    SerialUSB.print(" ");
   }
-  SerialUSB.println(input.cylinder, BIN);
   digitalWrite(EXTEND_PIN, input.cylinder & EXTEND_BIT ? HIGH : LOW);
   digitalWrite(THROW_PIN, input.cylinder & THROW_BIT ? HIGH : LOW);
 }
