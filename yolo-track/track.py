@@ -5,14 +5,16 @@ import cv2 as cv
 def track(model: YOLO, img: cv.Mat):
     return list(model.track(img, stream=True))
 
+TCP = "tcp://192.168.8.12:10001"
+HTTP = "http://192.168.8.12:10001"
+
 def main():
     model = YOLO("basketball-nano.pt", task="detect")
     pool = Pool(processes=1)
     results = None
     track_future = None
-    duration = None
 
-    cap = cv.VideoCapture('tcp://192.168.1.115:10001')
+    cap = cv.VideoCapture(HTTP)
 
     while True:
         success, img = cap.read()
