@@ -24,8 +24,10 @@ void setup() {
   }
   pinMode(EXTEND_PIN, OUTPUT);
   pinMode(THROW_PIN, OUTPUT);
+  pinMode(CATCH_PIN, OUTPUT);
   digitalWrite(EXTEND_PIN, LOW);
   digitalWrite(THROW_PIN, LOW);
+  digitalWrite(CATCH_PIN, LOW);
 
   while (Serial2.available() > 0) Serial2.read();
 }
@@ -43,4 +45,5 @@ void loop() {
   }
   digitalWrite(EXTEND_PIN, input.cylinder & EXTEND_BIT ? HIGH : LOW);
   digitalWrite(THROW_PIN, input.cylinder & THROW_BIT ? HIGH : LOW);
+  digitalWrite(CATCH_PIN, input.cylinder & CATCH_BIT ? HIGH : LOW);
 }
