@@ -4,10 +4,13 @@
 #include "vector2.h"
 
 namespace Movement {
-  const double MAX_ACCEL = 400.0;
+  const double MAX_VERTICAL_ACCEL = 400.0;
+  const double MAX_HORIZONTAL_ACCEL = 200.0;
+  const double MAX_ROTATION_ACCEL = 800.0;
+
   const double FAST_SPEED = 200.0;
   const double SLOW_SPEED = 100.0;
-  const double ROTATION_MULTIPLIER = 0.6;
+  const double ROTATION_SPEED = 40.0;
 
   Vector2 currentVelocity = {};
   double currentRotation = 0.0;
@@ -56,11 +59,12 @@ namespace Movement {
     }
     double speed = fastMode ? FAST_SPEED : SLOW_SPEED;
     Vector2 targetVelocity = direction.mul(speed);
-    double targetRotation = rotation * ROTATION_MULTIPLIER * speed;
+    double targetRotation = rotation * ROTATION_SPEED;
 
-    double acceleration = MAX_ACCEL * delta;
-    currentVelocity = currentVelocity.moveToward(targetVelocity, acceleration);
-    currentRotation = moveToward(currentRotation, targetRotation, acceleration);
+    currentRotation = moveToward(currentRotation, targetRotation, MAX_ROTATION_ACCEL * delta);
+    currentVelocity.x = moveToward(currentVelocity.x, targetVelocity.x, MAX_HORIZONTAL_ACCEL * delta);
+    currentVelocity.y = moveToward(currentVelocity.y, targetVelocity.y, MAX_VERTICAL_ACCEL * delta);
+    // currentRotation -= (currentVelocity.x - prevVelocity.x) * COUNTER_ROTATION_MULTIPLIER;
 
     setOmniSpeed(currentVelocity, currentRotation);
   }

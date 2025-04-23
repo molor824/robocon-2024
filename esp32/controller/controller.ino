@@ -47,8 +47,8 @@ double inactiveDuration = 0.0;
 
 unsigned long lastElapsed;
 
-const int16_t CENTER_X = 4;
-const int16_t CENTER_Y = 4;
+const int16_t CENTER_X = 0;
+const int16_t CENTER_Y = 0;
 
 bool keySpeedChange = false, keyBrake = false;
 bool prevSpeedChange = false;
@@ -109,16 +109,6 @@ void loop() {
     for (auto controller : myControllers) {
       if (controller && controller->isConnected() && controller->hasData() && controller->isGamepad()) {
         uint8_t dpad = controller->dpad();
-        // SerialOut out;
-        // out.directionX = controller->axisX() - CENTER_X;
-        // out.directionY = controller->axisY() - CENTER_Y;
-        // out.rotation = controller->axisRX() - CENTER_X;
-        // out.inputs = (controller->r1() ? KEY_SPEED_CHANGE : 0)
-        //   | (controller->b() ? KEY_EXTEND : 0)
-        //   | (controller->a() ? KEY_THROW : 0)
-        //   | (controller->x() ? KEY_CATCH : 0)
-        //   | (controller->y() ? KEY_RESET : 0);
-        // Serial2.write((uint8_t*)&out, sizeof(SerialOut));
 
         directionX = (double)(controller->axisX() - CENTER_X) / 512.0;
         directionY = (double)(controller->axisY() - CENTER_Y) / -512.0;

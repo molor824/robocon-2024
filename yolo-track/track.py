@@ -2,15 +2,17 @@ from ultralytics import YOLO
 from multiprocessing import Pool
 import cv2 as cv
 
-def track(model: YOLO, img: cv.Mat):
+model = YOLO("basketball-nano.pt", task="detect")
+
+def track(img: cv.Mat):
+    global model
     return list(model.track(img, stream=True))
 
 TCP = "tcp://192.168.8.12:10001"
 HTTP = "http://192.168.8.12:10001"
 
 def main():
-    model = YOLO("basketball-nano.pt", task="detect")
-    pool = Pool(processes=1)
+    pool = Pool(1)
     results = None
     track_future = None
 
@@ -22,12 +24,12 @@ def main():
             break
 
         if not track_future:
-            track_future = pool.apply_async(track, (model, img))
+            track_future = pool.apply_async(track, (img,))
         
         if track_future.ready():
             results = track_future.get()
-            track_future = pool.apply_async(track, (model, img))
-        
+            track_future = None
+
         if results:
             for result in results:
                 for box in result.boxes:
@@ -47,6 +49,7 @@ def main():
 
     cap.release()
     cv.destroyAllWindows()
+    pool.close()
 
 if __name__ == '__main__':
     main()
