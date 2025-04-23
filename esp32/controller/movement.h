@@ -10,7 +10,7 @@ namespace Movement {
 
   const double FAST_SPEED = 200.0;
   const double SLOW_SPEED = 100.0;
-  const double ROTATION_SPEED = 60.0;
+  const double ROTATION_SPEED = 40.0;
 
   Vector2 currentVelocity = {};
   double currentRotation = 0.0;
